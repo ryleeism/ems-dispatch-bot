@@ -436,7 +436,7 @@ function buildEmbed(lastCall = "None") {
 
         return `• ${member?.nickname || member?.user?.username || u.name}`;
       }).join("\n")
-    : "No units available";
+    : "No units on duty";
 
   const next90 = available.length
     ? available[rotation90 % available.length]?.name
@@ -447,21 +447,24 @@ function buildEmbed(lastCall = "None") {
     : "None";
 
   return new EmbedBuilder()
-    .setTitle("🚑 EMS DISPATCH MDT")
-    .setColor(0x2b2d31)
-    .addFields(
-      { name: "🟢 ON DUTY (10-41)", value: list },
-      {
-        name: "🔵 10-90",
-        value: `Next: **${next90}**\nCurrent: **${current90}**`,
-        inline: true
-      },
-      {
-        name: "🔴 10-33",
-        value: `Next: **${next33}**\nCurrent: **${current33}**`,
-        inline: true
-      }
+    .setTitle("🚑 CRIMSON CITY MEDICAL MDT")
+    .setColor(0x8B0000)
+    .setDescription(
+      `**DISPATCH OVERVIEW**\n\n` +
+      `🔵 **10-90**\n` +
+      `Current: ${current90}\n` +
+      `Next: ${next90}\n\n` +
+      `🔴 **10-33**\n` +
+      `Current: ${current33}\n` +
+      `Next: ${next33}`
     )
+    .addFields({
+      name: "🟢 ON DUTY UNITS (10-41)",
+      value: list
+    })
+    .setFooter({
+      text: `Crimson City Medical Department • Last: ${lastCall}`
+    })
     .setTimestamp();
 }
 
@@ -489,10 +492,10 @@ const logs = reversed.slice(start, start + perPage);
 
   return new EmbedBuilder()
     .setTitle("🧾 EMS CALL LOGS")
-    .setColor(0xff0000)
+    .setColor(0x8B0000) // main crimson
     .setDescription(
       "```" +
-      "TYPE   | RESPONDER | DISPATCHER | TIME\n" +
+      "TYPE  │ RESPONDER     │ DISPATCHER    │ TIME\n" +
       "----------------------------------------\n" +
       table +
       "```"
@@ -504,8 +507,15 @@ const logs = reversed.slice(start, start + perPage);
 // ===== BUTTONS =====
 function getMainButtons() {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("next_90").setLabel("Next 10-90").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("next_33").setLabel("Next 10-33").setStyle(ButtonStyle.Danger)
+    new ButtonBuilder()
+      .setCustomId("next_90")
+      .setLabel("Next 10-90")
+      .setStyle(ButtonStyle.Danger),
+
+    new ButtonBuilder()
+      .setCustomId("next_33")
+      .setLabel("Next 10-33")
+      .setStyle(ButtonStyle.Secondary)
   );
 }
 
