@@ -217,19 +217,25 @@ const commands = [
   new SlashCommandBuilder()
     .setName("add")
     .setDescription("Add unit")
-    .addUserOption(o => o.setName("user").setRequired(true)),
+    .addUserOption(o => 
+      o.setName("user").setDescription("User").setRequired(true)
+    ),
 
   new SlashCommandBuilder()
     .setName("remove")
     .setDescription("Remove unit")
-    .addUserOption(o => o.setName("user").setRequired(true)),
+    .addUserOption(o => 
+      o.setName("user").setDescription("User").setRequired(true)
+    ),
 
   new SlashCommandBuilder()
     .setName("status")
     .setDescription("Update status")
-    .addUserOption(o => o.setName("user").setRequired(true))
+    .addUserOption(o => 
+      o.setName("user").setDescription("User").setRequired(true)
+    )
     .addStringOption(o =>
-      o.setName("status").setRequired(true)
+      o.setName("status").setDescription("Status").setRequired(true)
         .addChoices(
           { name: "10-41", value: "10-41" },
           { name: "10-7", value: "10-7" },
@@ -240,7 +246,9 @@ const commands = [
   new SlashCommandBuilder()
     .setName("break")
     .setDescription("Set unit to 10-7")
-    .addUserOption(o => o.setName("user").setRequired(true)),
+    .addUserOption(o => 
+      o.setName("user").setDescription("User").setRequired(true)
+    ),
 
   new SlashCommandBuilder()
     .setName("reset")
