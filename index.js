@@ -31,7 +31,6 @@ let rotation90 = 0;
 let rotation33 = 0;
 let current90 = "None";
 let current33 = "None";
-let logsPage = 0;
 
 let dispatchMessage = null;
 let logsMessage = null;
@@ -53,7 +52,7 @@ function getBreakUnits() {
   return queue.filter(u => getStatus(u.id) === "10-7");
 }
 
-// ===== EMBED =====
+// ===== MAIN EMBED =====
 function buildEmbed(lastCall = "None") {
   const available = getAvailableUnits();
   const breakUnits = getBreakUnits();
@@ -66,11 +65,11 @@ function buildEmbed(lastCall = "None") {
   };
 
   const dutyList = available.length
-    ? available.map(u => `▫️ ${formatName(u)}`).join("\n")
+    ? available.map(u => `• ${formatName(u)}`).join("\n")
     : "No active units";
 
   const breakList = breakUnits.length
-    ? breakUnits.map(u => `▫️ ${formatName(u)}`).join("\n")
+    ? breakUnits.map(u => `• ${formatName(u)}`).join("\n")
     : "No units on standby";
 
   const next90 = available.length
@@ -85,13 +84,13 @@ function buildEmbed(lastCall = "None") {
     .setTitle("🚑 CCMD DISPATCH ROTATION")
     .setColor(0x8B0000)
     .setDescription(
-      `**🚨 ACTIVE DISPATCH**\n\n` +
-      `🔵 10-90: ${current90}\n` +
-      `🔴 10-33: ${current33}\n\n` +
+      `🚨 **ACTIVE DISPATCH**\n\n` +
+      `🔵 10-90 → ${current90}\n` +
+      `🔴 10-33 → ${current33}\n\n` +
       `━━━━━━━━━━━━━━━━━━\n\n` +
-      `**QUEUE STATUS**\n\n` +
-      `🔵 Next 10-90: ${next90}\n` +
-      `🔴 Next 10-33: ${next33}`
+      `📊 **QUEUE STATUS**\n\n` +
+      `🔵 Next 10-90 → ${next90}\n` +
+      `🔴 Next 10-33 → ${next33}`
     )
     .addFields(
       { name: "🟢 ON DUTY (10-41)", value: dutyList },
@@ -103,13 +102,18 @@ function buildEmbed(lastCall = "None") {
     .setTimestamp();
 }
 
-// ===== LOGS =====
+// ===== LOGS EMBED (FIXED WRAP) =====
 function buildLogsEmbed() {
   const logs = callLogs.slice(-6).reverse();
 
+  const shorten = (text, max) => {
+    if (!text) return "";
+    return text.length > max ? text.slice(0, max) + "…" : text;
+  };
+
   const table = logs.length
     ? logs.map(log =>
-        `${log.type} │ ${log.responder} │ ${log.dispatcher} │ ${log.time}`
+        `${shorten(log.type, 5).padEnd(5)} │ ${shorten(log.responder, 12).padEnd(12)} │ ${shorten(log.dispatcher, 10).padEnd(10)} │ ${shorten(log.time, 8)}`
       ).join("\n")
     : "No recent activity";
 
@@ -118,15 +122,15 @@ function buildLogsEmbed() {
     .setColor(0x5A0000)
     .setDescription(
       "```" +
-      "TYPE │ RESPONDER │ DISPATCHER │ TIME\n" +
-      "────────────────────────────────────\n" +
+      "TYPE  │ RESPONDER    │ DISPATCHER │ TIME\n" +
+      "──────┼──────────────┼────────────┼────────\n" +
       table +
       "```"
     )
     .setTimestamp();
 }
 
-// ===== BUTTONS =====
+// ===== BUTTONS (FIXED) =====
 function getMainButtons() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -239,8 +243,10 @@ client.on("interactionCreate", async interaction => {
       const user = interaction.options.getUser("user");
       const member = await interaction.guild.members.fetch(user.id);
 
-      queue.push({ id: user.id, name: member.nickname || user.username });
-      statuses[user.id] = "10-41";
+      if (!queue.find(u => u.id === user.id)) {
+        queue.push({ id: user.id, name: member.nickname || user.username });
+        statuses[user.id] = "10-41";
+      }
 
       await updatePanel(channel);
       return interaction.reply({ content: "✅ Added", flags: MessageFlags.Ephemeral });
@@ -256,7 +262,9 @@ client.on("interactionCreate", async interaction => {
 
     if (interaction.commandName === "remove") {
       const user = interaction.options.getUser("user");
+
       queue = queue.filter(u => u.id !== user.id);
+      delete statuses[user.id];
 
       await updatePanel(channel);
       return interaction.reply({ content: "❌ Removed", flags: MessageFlags.Ephemeral });
@@ -266,6 +274,8 @@ client.on("interactionCreate", async interaction => {
       queue = [];
       statuses = {};
       callLogs = [];
+      rotation90 = 0;
+      rotation33 = 0;
       current90 = "None";
       current33 = "None";
 
