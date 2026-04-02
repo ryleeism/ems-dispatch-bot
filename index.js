@@ -102,35 +102,24 @@ function buildEmbed(lastCall = "None") {
     .setTimestamp();
 }
 
-// ===== LOGS EMBED (FIXED WRAP) =====
+// ===== LOGS EMBED (FULL NAMES, CLEAN FORMAT) =====
 function buildLogsEmbed() {
   const logs = callLogs.slice(-6).reverse();
 
-  const shorten = (text, max) => {
-    if (!text) return "";
-    return text.length > max ? text.slice(0, max) + "…" : text;
-  };
-
-  const table = logs.length
+  const content = logs.length
     ? logs.map(log =>
-        `${shorten(log.type, 5).padEnd(5)} │ ${shorten(log.responder, 12).padEnd(12)} │ ${shorten(log.dispatcher, 10).padEnd(10)} │ ${shorten(log.time, 8)}`
-      ).join("\n")
+        `${log.type} → ${log.responder}\nDispatcher: ${log.dispatcher}\nTime: ${log.time}`
+      ).join("\n\n")
     : "No recent activity";
 
   return new EmbedBuilder()
     .setTitle("🧾 EMS CALL LOGS")
     .setColor(0x5A0000)
-    .setDescription(
-      "```" +
-      "TYPE  │ RESPONDER    │ DISPATCHER │ TIME\n" +
-      "──────┼──────────────┼────────────┼────────\n" +
-      table +
-      "```"
-    )
+    .setDescription(content)
     .setTimestamp();
 }
 
-// ===== BUTTONS (FIXED) =====
+// ===== BUTTONS =====
 function getMainButtons() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
