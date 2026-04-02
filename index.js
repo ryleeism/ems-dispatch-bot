@@ -85,14 +85,14 @@ function buildEmbed(lastCall = "None") {
     .setTitle("🚑 CCMD DISPATCH ROTATION")
     .setColor(0x8B0000)
     .setDescription(
-      `**DISPATCH OVERVIEW**\n\n` +
-      `🔵 **10-90**\n` +
-      `Current: ${current90}\n` +
-      `Next: ${next90}\n\n` +
-      `🔴 **10-33**\n` +
-      `Current: ${current33}\n` +
-      `Next: ${next33}`
-    )
+  `**🚨 ACTIVE DISPATCH**\n\n` +
+  `🔵 **10-90:** ${current90}\n` +
+  `🔴 **10-33:** ${current33}\n\n` +
+  `━━━━━━━━━━━━━━━━━━\n\n` +
+  `**QUEUE STATUS**\n\n` +
+  `🔵 Next 10-90: ${next90}\n` +
+  `🔴 Next 10-33: ${next33}`
+)
     .addFields(
       { name: "🟢 ON DUTY (10-41)", value: dutyList },
       { name: "🟡 ON BREAK (10-7)", value: breakList }
@@ -145,24 +145,24 @@ function buildLogsEmbed() {
 function getMainButtons() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId("next_90")
-      .setLabel("Next 10-90")
-      .setStyle(ButtonStyle.Danger),
+  .setCustomId("next_90")
+  .setLabel("Next 10-90")
+  .setStyle(ButtonStyle.Primary) // 🔵 better
 
-    new ButtonBuilder()
-      .setCustomId("skip_90")
-      .setLabel("Skip 10-90")
-      .setStyle(ButtonStyle.Secondary),
+new ButtonBuilder()
+  .setCustomId("skip_90")
+  .setLabel("Skip 10-90")
+  .setStyle(ButtonStyle.Secondary)
 
-    new ButtonBuilder()
-      .setCustomId("next_33")
-      .setLabel("Next 10-33")
-      .setStyle(ButtonStyle.Danger),
+new ButtonBuilder()
+  .setCustomId("next_33")
+  .setLabel("Next 10-33")
+  .setStyle(ButtonStyle.Danger) // 🔴 keep strong
 
-    new ButtonBuilder()
-      .setCustomId("skip_33")
-      .setLabel("Skip 10-33")
-      .setStyle(ButtonStyle.Secondary)
+new ButtonBuilder()
+  .setCustomId("skip_33")
+  .setLabel("Skip 10-33")
+  .setStyle(ButtonStyle.Secondary)
   );
 }
 
