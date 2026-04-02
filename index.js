@@ -49,19 +49,29 @@ function getAvailableUnits() {
   return queue.filter(u => getStatus(u.id) === "10-41");
 }
 
+function getBreakUnits() {
+  return queue.filter(u => getStatus(u.id) === "10-7");
+}
+
 // ===== MAIN EMBED =====
 function buildEmbed(lastCall = "None") {
   const available = getAvailableUnits();
+  const breakUnits = getBreakUnits();
 
-  const list = available.length
-    ? available.map(u => {
-        const member = client.guilds.cache
-          .get(GUILD_ID)
-          ?.members.cache.get(u.id);
+  const formatName = (u) => {
+    const member = client.guilds.cache
+      .get(GUILD_ID)
+      ?.members.cache.get(u.id);
+    return member?.nickname || member?.user?.username || u.name;
+  };
 
-        return `• ${member?.nickname || member?.user?.username || u.name}`;
-      }).join("\n")
+  const dutyList = available.length
+    ? available.map(u => `• ${formatName(u)}`).join("\n")
     : "No units on duty";
+
+  const breakList = breakUnits.length
+    ? breakUnits.map(u => `• ${formatName(u)}`).join("\n")
+    : "No units on break";
 
   const next90 = available.length
     ? available[rotation90 % available.length]?.name
@@ -72,7 +82,7 @@ function buildEmbed(lastCall = "None") {
     : "None";
 
   return new EmbedBuilder()
-    .setTitle("🚑 CRIMSON CITY MEDICAL MDT")
+    .setTitle("🚑 CCMD DISPATCH ROTATION")
     .setColor(0x8B0000)
     .setDescription(
       `**DISPATCH OVERVIEW**\n\n` +
@@ -83,10 +93,10 @@ function buildEmbed(lastCall = "None") {
       `Current: ${current33}\n` +
       `Next: ${next33}`
     )
-    .addFields({
-      name: "🟢 ON DUTY UNITS (10-41)",
-      value: list
-    })
+    .addFields(
+      { name: "🟢 ON DUTY (10-41)", value: dutyList },
+      { name: "🟡 ON BREAK (10-7)", value: breakList }
+    )
     .setFooter({
       text: `Crimson City Medical Department • Last: ${lastCall}`
     })
@@ -140,8 +150,18 @@ function getMainButtons() {
       .setStyle(ButtonStyle.Danger),
 
     new ButtonBuilder()
+      .setCustomId("skip_90")
+      .setLabel("Skip 10-90")
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
       .setCustomId("next_33")
       .setLabel("Next 10-33")
+      .setStyle(ButtonStyle.Danger),
+
+    new ButtonBuilder()
+      .setCustomId("skip_33")
+      .setLabel("Skip 10-33")
       .setStyle(ButtonStyle.Secondary)
   );
 }
@@ -197,25 +217,30 @@ const commands = [
   new SlashCommandBuilder()
     .setName("add")
     .setDescription("Add unit")
-    .addUserOption(o => o.setName("user").setDescription("User").setRequired(true)),
+    .addUserOption(o => o.setName("user").setRequired(true)),
 
   new SlashCommandBuilder()
     .setName("remove")
     .setDescription("Remove unit")
-    .addUserOption(o => o.setName("user").setDescription("User").setRequired(true)),
+    .addUserOption(o => o.setName("user").setRequired(true)),
 
   new SlashCommandBuilder()
     .setName("status")
     .setDescription("Update status")
-    .addUserOption(o => o.setName("user").setDescription("User").setRequired(true))
+    .addUserOption(o => o.setName("user").setRequired(true))
     .addStringOption(o =>
-      o.setName("status").setDescription("Status").setRequired(true)
+      o.setName("status").setRequired(true)
         .addChoices(
           { name: "10-41", value: "10-41" },
           { name: "10-7", value: "10-7" },
           { name: "10-6", value: "10-6" }
         )
     ),
+
+  new SlashCommandBuilder()
+    .setName("break")
+    .setDescription("Set unit to 10-7")
+    .addUserOption(o => o.setName("user").setRequired(true)),
 
   new SlashCommandBuilder()
     .setName("reset")
@@ -256,6 +281,14 @@ client.on("interactionCreate", async interaction => {
       return interaction.reply({ content: "✅ Added", flags: MessageFlags.Ephemeral });
     }
 
+    if (interaction.commandName === "break") {
+      const user = interaction.options.getUser("user");
+      statuses[user.id] = "10-7";
+
+      await updatePanel(channel);
+      return interaction.reply({ content: "🟡 Set to 10-7", flags: MessageFlags.Ephemeral });
+    }
+
     if (interaction.commandName === "remove") {
       const user = interaction.options.getUser("user");
       queue = queue.filter(u => u.id !== user.id);
@@ -293,54 +326,57 @@ client.on("interactionCreate", async interaction => {
 
   if (interaction.isButton()) {
 
-    if (!isDispatcher(interaction.member)) {
-      return interaction.reply({ content: "❌ Dispatcher only", flags: MessageFlags.Ephemeral });
-    }
+    if (!isDispatcher(interaction.member)) return;
 
     await interaction.deferUpdate();
-
     const channel = await client.channels.fetch(CHANNEL_ID);
 
     if (interaction.customId === "next_logs") {
       logsPage++;
-      await updateLogsPanel(channel);
-      return;
+      return updateLogsPanel(channel);
     }
 
     if (interaction.customId === "prev_logs") {
       logsPage = Math.max(0, logsPage - 1);
-      await updateLogsPanel(channel);
-      return;
+      return updateLogsPanel(channel);
     }
 
     const available = getAvailableUnits();
-    if (available.length === 0) return;
+    if (!available.length) return;
 
     const dispatcher = interaction.member.nickname || interaction.user.username;
     const time = new Date().toLocaleTimeString();
 
+    if (interaction.customId === "skip_90") {
+      rotation90 = (rotation90 + 1) % available.length;
+      return updatePanel(channel);
+    }
+
+    if (interaction.customId === "skip_33") {
+      rotation33 = (rotation33 + 1) % available.length;
+      return updatePanel(channel);
+    }
+
     if (interaction.customId === "next_90") {
       const unit = available[rotation90 % available.length];
       rotation90 = (rotation90 + 1) % available.length;
-
       current90 = unit.name;
 
       callLogs.push({ type: "10-90", responder: unit.name, dispatcher, time });
 
       await updatePanel(channel, `10-90 → ${unit.name}`);
-      await updateLogsPanel(channel);
+      return updateLogsPanel(channel);
     }
 
     if (interaction.customId === "next_33") {
       const unit = available[rotation33 % available.length];
       rotation33 = (rotation33 + 1) % available.length;
-
       current33 = unit.name;
 
       callLogs.push({ type: "10-33", responder: unit.name, dispatcher, time });
 
       await updatePanel(channel, `10-33 → ${unit.name}`);
-      await updateLogsPanel(channel);
+      return updateLogsPanel(channel);
     }
   }
 });
