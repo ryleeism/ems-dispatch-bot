@@ -12,7 +12,7 @@ const {
 } = require("discord.js");
 
 // ===== CONFIG =====
-const TOKEN = process.env.TOKEN;
+const TOKEN = process.env.TOKEN || "PUT_YOUR_TOKEN_HERE";
 const CLIENT_ID = "1489203701322354729";
 const GUILD_ID = "1444442307150483730";
 const DISPATCHER_ROLE = "Dispatcher";
@@ -20,7 +20,7 @@ const CHANNEL_ID = "1448140712985104520";
 
 // ===== CLIENT =====
 const client = new Client({
- intents: [GatewayIntentBits.Guilds]
+  intents: [GatewayIntentBits.Guilds] // ✅ SAFE ONLY
 });
 
 // ===== DATA =====
@@ -42,12 +42,6 @@ function getStatus(id) {
 
 function isDispatcher(member) {
   return member.roles.cache.some(r => r.name === DISPATCHER_ROLE);
-}
-
-// ⚡ FAST NAME (CACHED)
-function getName(id) {
-  const unit = queue.find(u => u.id === id);
-  return unit?.name || "Unknown";
 }
 
 function getAvailableUnits() {
@@ -155,13 +149,17 @@ async function updateLogsPanel(channel) {
   }
 }
 
-// ===== READY =====
-client.once("clientReady", async () => {
+// ===== READY (FIXED) =====
+client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 
-  const channel = await client.channels.fetch(CHANNEL_ID);
-  await updateLogsPanel(channel);
-  await updatePanel(channel);
+  try {
+    const channel = await client.channels.fetch(CHANNEL_ID);
+    await updateLogsPanel(channel);
+    await updatePanel(channel);
+  } catch (err) {
+    console.error("Channel fetch failed:", err);
+  }
 });
 
 // ===== COMMANDS =====
@@ -176,10 +174,15 @@ const commands = [
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
-  await rest.put(
-    Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-    { body: commands }
-  );
+  try {
+    await rest.put(
+      Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+      { body: commands }
+    );
+    console.log("✅ Commands registered");
+  } catch (err) {
+    console.error("Command registration failed:", err);
+  }
 })();
 
 // ===== INTERACTIONS =====
@@ -193,23 +196,16 @@ client.on("interactionCreate", async interaction => {
 
     const channel = await client.channels.fetch(CHANNEL_ID);
     const user = interaction.options.getUser("user");
-if (interaction.commandName === "add") {
-  const user = interaction.options.getUser("user");
 
-  if (!queue.find(u => u.id === user.id)) {
-    queue.push({
-      id: user.id,
-      name: user.username // 🔥 NO FETCH = NO CRASH
-    });
-    statuses[user.id] = "10-41";
-  }
+    if (interaction.commandName === "add") {
+      if (!queue.find(u => u.id === user.id)) {
+        queue.push({ id: user.id, name: user.username });
+        statuses[user.id] = "10-41";
+      }
 
-  await updatePanel(channel);
-  return interaction.reply({
-    content: "✅ Added",
-    flags: MessageFlags.Ephemeral
-  });
-}
+      await updatePanel(channel);
+      return interaction.reply({ content: "✅ Added", flags: MessageFlags.Ephemeral });
+    }
 
     if (interaction.commandName === "break") {
       if (!queue.find(u => u.id === user.id)) {
@@ -261,7 +257,7 @@ if (interaction.commandName === "add") {
 
     if (!available.length) return;
 
-    const dispatcher = interaction.member.nickname || interaction.user.username;
+    const dispatcher = interaction.user.username;
     const time = new Date().toLocaleTimeString();
 
     if (interaction.customId === "skip_90") {
@@ -279,12 +275,7 @@ if (interaction.commandName === "add") {
       rotation90++;
       current90 = unit.name;
 
-      callLogs.push({
-        type: "10-90",
-        responder: unit.name,
-        dispatcher,
-        time
-      });
+      callLogs.push({ type: "10-90", responder: unit.name, dispatcher, time });
 
       await updatePanel(channel, `10-90 → ${unit.name}`);
       return updateLogsPanel(channel);
@@ -295,12 +286,7 @@ if (interaction.commandName === "add") {
       rotation33++;
       current33 = unit.name;
 
-      callLogs.push({
-        type: "10-33",
-        responder: unit.name,
-        dispatcher,
-        time
-      });
+      callLogs.push({ type: "10-33", responder: unit.name, dispatcher, time });
 
       await updatePanel(channel, `10-33 → ${unit.name}`);
       return updateLogsPanel(channel);
