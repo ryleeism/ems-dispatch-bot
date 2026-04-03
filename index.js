@@ -20,7 +20,10 @@ const CHANNEL_ID = "1448140712985104520";
 
 // ===== CLIENT =====
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers // ⚡ SPEED BOOST
+  ]
 });
 
 // ===== DATA =====
@@ -44,6 +47,12 @@ function isDispatcher(member) {
   return member.roles.cache.some(r => r.name === DISPATCHER_ROLE);
 }
 
+// ⚡ FAST NAME (CACHED)
+function getName(id) {
+  const unit = queue.find(u => u.id === id);
+  return unit?.name || "Unknown";
+}
+
 function getAvailableUnits() {
   return queue.filter(u => getStatus(u.id) === "10-41");
 }
@@ -52,32 +61,25 @@ function getBreakUnits() {
   return queue.filter(u => getStatus(u.id) === "10-7");
 }
 
-// ===== MAIN EMBED =====
+// ===== EMBED =====
 function buildEmbed(lastCall = "None") {
   const available = getAvailableUnits();
   const breakUnits = getBreakUnits();
 
-  const formatName = (u) => {
-    const member = client.guilds.cache
-      .get(GUILD_ID)
-      ?.members.cache.get(u.id);
-    return member?.nickname || member?.user?.username || u.name;
-  };
-
   const dutyList = available.length
-    ? available.map(u => `• ${formatName(u)}`).join("\n")
+    ? available.map(u => `• ${u.name}`).join("\n")
     : "No active units";
 
   const breakList = breakUnits.length
-    ? breakUnits.map(u => `• ${formatName(u)}`).join("\n")
+    ? breakUnits.map(u => `• ${u.name}`).join("\n")
     : "No units on standby";
 
   const next90 = available.length
-    ? available[rotation90 % available.length]?.name
+    ? available[rotation90 % available.length].name
     : "None";
 
   const next33 = available.length
-    ? available[rotation33 % available.length]?.name
+    ? available[rotation33 % available.length].name
     : "None";
 
   return new EmbedBuilder()
@@ -102,7 +104,7 @@ function buildEmbed(lastCall = "None") {
     .setTimestamp();
 }
 
-// ===== LOGS EMBED (FULL NAMES, CLEAN FORMAT) =====
+// ===== LOGS =====
 function buildLogsEmbed() {
   const logs = callLogs.slice(-6).reverse();
 
@@ -122,25 +124,10 @@ function buildLogsEmbed() {
 // ===== BUTTONS =====
 function getMainButtons() {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("next_90")
-      .setLabel("Next 10-90")
-      .setStyle(ButtonStyle.Primary),
-
-    new ButtonBuilder()
-      .setCustomId("skip_90")
-      .setLabel("Skip 10-90")
-      .setStyle(ButtonStyle.Secondary),
-
-    new ButtonBuilder()
-      .setCustomId("next_33")
-      .setLabel("Next 10-33")
-      .setStyle(ButtonStyle.Danger),
-
-    new ButtonBuilder()
-      .setCustomId("skip_33")
-      .setLabel("Skip 10-33")
-      .setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("next_90").setLabel("Next 10-90").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("skip_90").setLabel("Skip 10-90").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("next_33").setLabel("Next 10-33").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("skip_33").setLabel("Skip 10-33").setStyle(ButtonStyle.Secondary)
   );
 }
 
@@ -182,30 +169,11 @@ client.once("clientReady", async () => {
 
 // ===== COMMANDS =====
 const commands = [
-  new SlashCommandBuilder()
-    .setName("add")
-    .setDescription("Add unit")
-    .addUserOption(o =>
-      o.setName("user").setDescription("User").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("break")
-    .setDescription("Set unit to 10-7")
-    .addUserOption(o =>
-      o.setName("user").setDescription("User").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("remove")
-    .setDescription("Remove unit")
-    .addUserOption(o =>
-      o.setName("user").setDescription("User").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("reset")
-    .setDescription("Reset system")
+  new SlashCommandBuilder().setName("add").setDescription("Add unit").addUserOption(o => o.setName("user").setRequired(true)),
+  new SlashCommandBuilder().setName("break").setDescription("Set unit to 10-7").addUserOption(o => o.setName("user").setRequired(true)),
+  new SlashCommandBuilder().setName("resume").setDescription("Return unit to 10-41").addUserOption(o => o.setName("user").setRequired(true)),
+  new SlashCommandBuilder().setName("remove").setDescription("Remove unit").addUserOption(o => o.setName("user").setRequired(true)),
+  new SlashCommandBuilder().setName("reset").setDescription("Reset system")
 ];
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);
@@ -227,13 +195,16 @@ client.on("interactionCreate", async interaction => {
     }
 
     const channel = await client.channels.fetch(CHANNEL_ID);
+    const user = interaction.options.getUser("user");
 
     if (interaction.commandName === "add") {
-      const user = interaction.options.getUser("user");
       const member = await interaction.guild.members.fetch(user.id);
 
       if (!queue.find(u => u.id === user.id)) {
-        queue.push({ id: user.id, name: member.nickname || user.username });
+        queue.push({
+          id: user.id,
+          name: member.nickname || user.username // ⚡ cached here
+        });
         statuses[user.id] = "10-41";
       }
 
@@ -242,16 +213,22 @@ client.on("interactionCreate", async interaction => {
     }
 
     if (interaction.commandName === "break") {
-      const user = interaction.options.getUser("user");
-      statuses[user.id] = "10-7";
+      if (!queue.find(u => u.id === user.id)) {
+        return interaction.reply({ content: "❌ Not in queue", flags: MessageFlags.Ephemeral });
+      }
 
+      statuses[user.id] = "10-7";
       await updatePanel(channel);
       return interaction.reply({ content: "🟡 Set to break", flags: MessageFlags.Ephemeral });
     }
 
-    if (interaction.commandName === "remove") {
-      const user = interaction.options.getUser("user");
+    if (interaction.commandName === "resume") {
+      statuses[user.id] = "10-41";
+      await updatePanel(channel);
+      return interaction.reply({ content: "🟢 Back on duty", flags: MessageFlags.Ephemeral });
+    }
 
+    if (interaction.commandName === "remove") {
       queue = queue.filter(u => u.id !== user.id);
       delete statuses[user.id];
 
@@ -289,12 +266,12 @@ client.on("interactionCreate", async interaction => {
     const time = new Date().toLocaleTimeString();
 
     if (interaction.customId === "skip_90") {
-      rotation90 = (rotation90 + 1) % available.length;
+      rotation90++;
       return updatePanel(channel);
     }
 
     if (interaction.customId === "skip_33") {
-      rotation33 = (rotation33 + 1) % available.length;
+      rotation33++;
       return updatePanel(channel);
     }
 
@@ -303,7 +280,12 @@ client.on("interactionCreate", async interaction => {
       rotation90++;
       current90 = unit.name;
 
-      callLogs.push({ type: "10-90", responder: unit.name, dispatcher, time });
+      callLogs.push({
+        type: "10-90",
+        responder: unit.name,
+        dispatcher,
+        time
+      });
 
       await updatePanel(channel, `10-90 → ${unit.name}`);
       return updateLogsPanel(channel);
@@ -314,7 +296,12 @@ client.on("interactionCreate", async interaction => {
       rotation33++;
       current33 = unit.name;
 
-      callLogs.push({ type: "10-33", responder: unit.name, dispatcher, time });
+      callLogs.push({
+        type: "10-33",
+        responder: unit.name,
+        dispatcher,
+        time
+      });
 
       await updatePanel(channel, `10-33 → ${unit.name}`);
       return updateLogsPanel(channel);
