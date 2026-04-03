@@ -183,11 +183,45 @@ client.once("ready", async () => {
 
 // ===== COMMANDS =====
 const commands = [
-  new SlashCommandBuilder().setName("add").setDescription("Add unit").addUserOption(o => o.setName("user").setRequired(true)),
-  new SlashCommandBuilder().setName("break").setDescription("Set unit to 10-7").addUserOption(o => o.setName("user").setRequired(true)),
-  new SlashCommandBuilder().setName("resume").setDescription("Return unit to 10-41").addUserOption(o => o.setName("user").setRequired(true)),
-  new SlashCommandBuilder().setName("remove").setDescription("Remove unit").addUserOption(o => o.setName("user").setRequired(true)),
-  new SlashCommandBuilder().setName("reset").setDescription("Reset system")
+  new SlashCommandBuilder()
+    .setName("add")
+    .setDescription("Add unit")
+    .addUserOption(o =>
+      o.setName("user")
+        .setDescription("User to add") // ✅ REQUIRED
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("break")
+    .setDescription("Set unit to 10-7")
+    .addUserOption(o =>
+      o.setName("user")
+        .setDescription("User to set break")
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("resume")
+    .setDescription("Return unit to 10-41")
+    .addUserOption(o =>
+      o.setName("user")
+        .setDescription("User to resume")
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("remove")
+    .setDescription("Remove unit")
+    .addUserOption(o =>
+      o.setName("user")
+        .setDescription("User to remove")
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("reset")
+    .setDescription("Reset system")
 ];
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);
