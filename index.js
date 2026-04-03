@@ -20,7 +20,10 @@ const CHANNEL_ID = "1448140712985104520";
 
 // ===== CLIENT =====
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds] // ✅ SAFE ONLY
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers // 🔥 needed for full nickname system
+  ]
 });
 
 // ===== DATA =====
@@ -34,6 +37,26 @@ let current33 = "None";
 
 let dispatchMessage = null;
 let logsMessage = null;
+
+// ===== NAME CACHE (⚡ SPEED) =====
+const nameCache = new Map();
+
+// 🔥 ALWAYS GET NICKNAME (FAST + SAFE)
+async function getFullName(guild, user) {
+  if (nameCache.has(user.id)) return nameCache.get(user.id);
+
+  try {
+    const member = await guild.members.fetch(user.id);
+    const name = member.nickname || user.username;
+
+    nameCache.set(user.id, name);
+    return name;
+  } catch (err) {
+    const fallback = user.username;
+    nameCache.set(user.id, fallback);
+    return fallback;
+  }
+}
 
 // ===== HELPERS =====
 function getStatus(id) {
@@ -149,17 +172,13 @@ async function updateLogsPanel(channel) {
   }
 }
 
-// ===== READY (FIXED) =====
+// ===== READY =====
 client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 
-  try {
-    const channel = await client.channels.fetch(CHANNEL_ID);
-    await updateLogsPanel(channel);
-    await updatePanel(channel);
-  } catch (err) {
-    console.error("Channel fetch failed:", err);
-  }
+  const channel = await client.channels.fetch(CHANNEL_ID);
+  await updateLogsPanel(channel);
+  await updatePanel(channel);
 });
 
 // ===== COMMANDS =====
@@ -174,15 +193,10 @@ const commands = [
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
-  try {
-    await rest.put(
-      Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-      { body: commands }
-    );
-    console.log("✅ Commands registered");
-  } catch (err) {
-    console.error("Command registration failed:", err);
-  }
+  await rest.put(
+    Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+    { body: commands }
+  );
 })();
 
 // ===== INTERACTIONS =====
@@ -198,8 +212,11 @@ client.on("interactionCreate", async interaction => {
     const user = interaction.options.getUser("user");
 
     if (interaction.commandName === "add") {
+
+      const name = await getFullName(interaction.guild, user);
+
       if (!queue.find(u => u.id === user.id)) {
-        queue.push({ id: user.id, name: user.username });
+        queue.push({ id: user.id, name });
         statuses[user.id] = "10-41";
       }
 
@@ -208,10 +225,6 @@ client.on("interactionCreate", async interaction => {
     }
 
     if (interaction.commandName === "break") {
-      if (!queue.find(u => u.id === user.id)) {
-        return interaction.reply({ content: "❌ Not in queue", flags: MessageFlags.Ephemeral });
-      }
-
       statuses[user.id] = "10-7";
       await updatePanel(channel);
       return interaction.reply({ content: "🟡 Set to break", flags: MessageFlags.Ephemeral });
@@ -225,6 +238,7 @@ client.on("interactionCreate", async interaction => {
 
     if (interaction.commandName === "remove") {
       queue = queue.filter(u => u.id !== user.id);
+      nameCache.delete(user.id);
       delete statuses[user.id];
 
       await updatePanel(channel);
@@ -235,6 +249,7 @@ client.on("interactionCreate", async interaction => {
       queue = [];
       statuses = {};
       callLogs = [];
+      nameCache.clear();
       rotation90 = 0;
       rotation33 = 0;
       current90 = "None";
@@ -257,7 +272,7 @@ client.on("interactionCreate", async interaction => {
 
     if (!available.length) return;
 
-    const dispatcher = interaction.user.username;
+    const dispatcher = interaction.member.nickname || interaction.user.username;
     const time = new Date().toLocaleTimeString();
 
     if (interaction.customId === "skip_90") {
