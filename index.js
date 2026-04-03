@@ -198,19 +198,23 @@ client.on("interactionCreate", async interaction => {
     const user = interaction.options.getUser("user");
 
     if (interaction.commandName === "add") {
-      const member = await interaction.guild.members.fetch(user.id);
+  let name = user.username;
 
-      if (!queue.find(u => u.id === user.id)) {
-        queue.push({
-          id: user.id,
-          name: member.nickname || user.username // ⚡ cached here
-        });
-        statuses[user.id] = "10-41";
-      }
+  try {
+    const member = await interaction.guild.members.fetch(user.id);
+    name = member.nickname || user.username;
+  } catch (err) {
+    console.log("Fetch failed, using username");
+  }
 
-      await updatePanel(channel);
-      return interaction.reply({ content: "✅ Added", flags: MessageFlags.Ephemeral });
-    }
+  if (!queue.find(u => u.id === user.id)) {
+    queue.push({ id: user.id, name });
+    statuses[user.id] = "10-41";
+  }
+
+  await updatePanel(channel);
+  return interaction.reply({ content: "✅ Added", flags: MessageFlags.Ephemeral });
+}
 
     if (interaction.commandName === "break") {
       if (!queue.find(u => u.id === user.id)) {
