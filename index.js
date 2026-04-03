@@ -20,10 +20,7 @@ const CHANNEL_ID = "1448140712985104520";
 
 // ===== CLIENT =====
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers // ⚡ SPEED BOOST
-  ]
+ intents: [GatewayIntentBits.Guilds]
 });
 
 // ===== DATA =====
@@ -196,24 +193,22 @@ client.on("interactionCreate", async interaction => {
 
     const channel = await client.channels.fetch(CHANNEL_ID);
     const user = interaction.options.getUser("user");
-
-    if (interaction.commandName === "add") {
-  let name = user.username;
-
-  try {
-    const member = await interaction.guild.members.fetch(user.id);
-    name = member.nickname || user.username;
-  } catch (err) {
-    console.log("Fetch failed, using username");
-  }
+if (interaction.commandName === "add") {
+  const user = interaction.options.getUser("user");
 
   if (!queue.find(u => u.id === user.id)) {
-    queue.push({ id: user.id, name });
+    queue.push({
+      id: user.id,
+      name: user.username // 🔥 NO FETCH = NO CRASH
+    });
     statuses[user.id] = "10-41";
   }
 
   await updatePanel(channel);
-  return interaction.reply({ content: "✅ Added", flags: MessageFlags.Ephemeral });
+  return interaction.reply({
+    content: "✅ Added",
+    flags: MessageFlags.Ephemeral
+  });
 }
 
     if (interaction.commandName === "break") {
